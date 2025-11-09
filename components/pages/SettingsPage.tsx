@@ -1,0 +1,188 @@
+import React from 'react';
+import { Currency, Transaction, TransactionType } from '../../types';
+import { CURRENCIES } from '../../constants';
+import Dropdown from '../ui/Dropdown';
+import jsPDF from 'jspdf';
+import autoTable from 'jspdf-autotable';
+
+interface SettingsPageProps {
+  currentCurrency: Currency;
+  setCurrency: (currency: Currency) => void;
+  transactions: Transaction[];
+  userEmail: string;
+}
+
+const SettingsPage: React.FC<SettingsPageProps> = ({ currentCurrency, setCurrency, transactions, userEmail }) => {
+  
+  const currencyOptions = CURRENCIES.map(c => ({
+    value: c.code,
+    label: `${c.code} (${c.symbol})`
+  }));
+  
+  const handleCurrencyChange = (newCode: string) => {
+    const newCurrency = CURRENCIES.find(c => c.code === newCode);
+    if (newCurrency) {
+      setCurrency(newCurrency);
+    }
+  };
+
+  const handleExportCSV = () => {
+    const headers = ["ID", "Date", "Description", "Category", "Type", "Amount", "Currency"];
+    const csvRows = [headers.join(',')]; // Header row
+
+    const sortedTransactions = [...transactions].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    for (const transaction of sortedTransactions) {
+        // Escape commas and quotes in description
+        const description = `"${transaction.description.replace(/"/g, '""')}"`;
+        const values = [
+            transaction.id,
+            transaction.date,
+            description,
+            transaction.category,
+            transaction.type,
+            transaction.amount.toFixed(2),
+            currentCurrency.code
+        ];
+        csvRows.push(values.join(','));
+    }
+
+    const csvString = csvRows.join('\n');
+    const blob = new Blob([csvString], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.setAttribute("href", url);
+    link.setAttribute("download", `expenzo_report_${userEmail}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
+  const handleExportPDF = () => {
+    const doc = new jsPDF();
+    const tableColumn = ["Date", "Description", "Category", "Type", "Amount"];
+    const tableRows: (string | number)[][] = [];
+
+    const sortedTransactions = [...transactions].sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime());
+
+    sortedTransactions.forEach(transaction => {
+        const amountString = `${transaction.type === TransactionType.INCOME ? '+' : '-'}${transaction.amount.toFixed(2)} ${currentCurrency.code}`;
+        const transactionData = [
+            new Date(transaction.date).toLocaleDateString(),
+            transaction.description,
+            transaction.category,
+            transaction.type,
+            amountString,
+        ];
+        tableRows.push(transactionData);
+    });
+    
+    // Header
+    doc.setFontSize(22);
+    doc.setFont('helvetica', 'bold');
+    doc.text("expenzo", 14, 22);
+    doc.setFontSize(14);
+    doc.setFont('helvetica', 'normal');
+    doc.text("Transaction Report", 14, 30);
+
+    doc.setFontSize(10);
+    doc.setTextColor(100);
+    doc.text(`User: ${userEmail}`, 14, 36);
+    doc.text(`Report Generated: ${new Date().toLocaleString()}`, 14, 41);
+
+    // Summary
+    const totalIncome = transactions
+      .filter(t => t.type === TransactionType.INCOME)
+      .reduce((sum, t) => sum + t.amount, 0);
+    const totalExpenses = transactions
+      .filter(t => t.type === TransactionType.EXPENSE)
+      .reduce((sum, t) => sum + t.amount, 0);
+    const balance = totalIncome - totalExpenses;
+    
+    doc.setFontSize(12);
+    doc.setFont('helvetica', 'bold');
+    doc.setTextColor(0);
+    doc.text("Financial Summary", 14, 55);
+
+    autoTable(doc, {
+        body: [
+            ['Total Income:', `${totalIncome.toFixed(2)} ${currentCurrency.code}`],
+            ['Total Expenses:', `${totalExpenses.toFixed(2)} ${currentCurrency.code}`],
+            ['Final Balance:', `${balance.toFixed(2)} ${currentCurrency.code}`],
+        ],
+        startY: 58,
+        theme: 'grid',
+        styles: {
+            font: 'helvetica',
+            fontSize: 10,
+        },
+        headStyles: {
+            fillColor: [241, 245, 249]
+        },
+        columnStyles: {
+            0: { fontStyle: 'bold', cellWidth: 40 },
+        }
+    });
+
+    const finalY = (doc as any).lastAutoTable.finalY || 80;
+
+    // Table
+    autoTable(doc, {
+        head: [tableColumn],
+        body: tableRows,
+        startY: finalY + 10,
+        headStyles: { fillColor: [8, 47, 73] }, // primary-950 color
+        alternateRowStyles: { fillColor: [248, 250, 252] },
+        didDrawPage: (data) => {
+            // Footer
+            const pageCount = doc.getNumberOfPages();
+            doc.setFontSize(10);
+            doc.setTextColor(150);
+            doc.text(`Page ${data.pageNumber} of ${pageCount} | Generated by expenzo`, data.settings.margin.left, doc.internal.pageSize.height - 10);
+        }
+    });
+
+
+    doc.save(`expenzo_report_${userEmail}.pdf`);
+  };
+
+  return (
+    <div>
+      <h2 className="text-3xl font-bold text-gray-800 mb-6">Settings</h2>
+      
+      <div className="bg-white p-6 md:p-8 rounded-xl shadow-md mb-8">
+        <h3 className="text-xl font-semibold text-gray-700 mb-4">Currency</h3>
+        <p className="text-gray-500 mb-4">Select your preferred currency. This will be reflected across the entire application.</p>
+        <div className="w-full md:w-1/3">
+           <Dropdown
+              options={currencyOptions}
+              value={currentCurrency.code}
+              onChange={handleCurrencyChange}
+            />
+        </div>
+      </div>
+
+      <div className="bg-white p-6 md:p-8 rounded-xl shadow-md">
+        <h3 className="text-xl font-semibold text-gray-700 mb-4">Data Management</h3>
+        <p className="text-gray-500 mb-4">Export your transaction data in your preferred format.</p>
+        <div className="flex flex-col sm:flex-row space-y-3 sm:space-y-0 sm:space-x-4">
+            <button
+                onClick={handleExportPDF}
+                className="px-5 py-2.5 bg-primary-600 text-white font-medium rounded-lg hover:bg-primary-700 shadow transition-colors"
+            >
+                Export as PDF
+            </button>
+             <button
+                onClick={handleExportCSV}
+                className="px-5 py-2.5 bg-gray-600 text-white font-medium rounded-lg hover:bg-gray-700 shadow transition-colors"
+            >
+                Export as CSV
+            </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default SettingsPage;
