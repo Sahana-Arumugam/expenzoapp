@@ -1,6 +1,3 @@
-# Docs for the Azure Web Apps Deploy action: https://github.com/Azure/webapps-deploy
-# More GitHub Actions for Azure: https://github.com/Azure/actions
-
 name: Build and deploy Vite React app to Azure Web App - expenzo-frontend
 
 on:
@@ -13,7 +10,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     permissions:
-      contents: read # Required for actions/checkout
+      contents: read
 
     steps:
       - uses: actions/checkout@v4
@@ -28,24 +25,25 @@ jobs:
           npm ci
           npm run build
 
-      - name: Upload dist folder for deployment
+      - name: Upload build artifacts
         uses: actions/upload-artifact@v4
         with:
           name: vite-build
-          path: dist  # ✅ This is where Vite puts the built frontend files
+          path: dist  # built folder from Vite
 
   deploy:
     runs-on: ubuntu-latest
     needs: build
     permissions:
-      id-token: write # Required for OIDC (user-assigned identity)
+      id-token: write
       contents: read
 
     steps:
-      - name: Download artifact
+      - name: Download build artifact
         uses: actions/download-artifact@v4
         with:
           name: vite-build
+          path: dist  # extract the artifact into a 'dist' folder so Azure can find it
 
       - name: Login to Azure
         uses: azure/login@v2
@@ -59,4 +57,4 @@ jobs:
         with:
           app-name: 'expenzo-frontend'
           slot-name: 'Production'
-          package: dist  # ✅ Deploy only the built Vite files
+          package: dist  # deploy the extracted artifact
