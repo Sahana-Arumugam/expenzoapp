@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import axios from 'axios';
 import { Page, Transaction, Category, Budget, Currency, UserCredentials, UserData, TransactionType } from './types';
 import { INITIAL_USERS, INITIAL_ALL_USERS_DATA, NEW_USER_DATA_TEMPLATE, INITIAL_CATEGORIES } from './constants';
 import Sidebar from './components/layout/Sidebar';
@@ -70,12 +71,79 @@ const App: React.FC = () => {
         }));
     };
 
+    const getAuthHeaders = () => {
+        const token = localStorage.getItem('token');
+        return token ? { headers: { Authorization: `Bearer ${token}` } } : null;
+    };
+
+    const fetchExpensesFromServer = async (email: string) => {
+        try {
+            const headers = getAuthHeaders();
+            if (!headers) return;
+            const res = await axios.get('/api/expenzo/expenses', headers);
+            const serverExpenses: Transaction[] = res.data.map((e: any) => ({
+                id: e._id,
+                type: TransactionType.EXPENSE,
+                amount: Number(e.amount),
+                category: e.category || 'Uncategorized',
+                date: new Date(e.date).toISOString().split('T')[0],
+                description: e.description || '',
+                isRecurring: false,
+            }));
+
+            // Merge server expenses with any existing local incomes/transactions
+            setAllUsersData(prev => {
+                const existing = prev[email] || NEW_USER_DATA_TEMPLATE;
+                // keep income transactions that are local-only
+                const localIncomes = existing.transactions.filter(t => t.type === TransactionType.INCOME);
+                return {
+                    ...prev,
+                    [email]: {
+                        ...existing,
+                        transactions: [...serverExpenses, ...localIncomes],
+                    }
+                };
+            });
+        } catch (err) {
+            console.error('Failed to fetch server expenses', err);
+        }
+    };
+
     const addTransaction = (transaction: Omit<Transaction, 'id'>) => {
-        const newTransaction = { ...transaction, id: `t-${Date.now()}` };
-        modifyCurrentUserData(data => ({
-            ...data,
-            transactions: [newTransaction, ...data.transactions]
-        }));
+        (async () => {
+            const headers = getAuthHeaders();
+            // Only persist to server for EXPENSE type (backend supports expenses)
+            if (headers && transaction.type === TransactionType.EXPENSE) {
+                try {
+                    const res = await axios.post('/api/expenzo/expenses', {
+                        amount: transaction.amount,
+                        category: transaction.category,
+                        description: transaction.description,
+                        date: transaction.date,
+                    }, headers);
+
+                    const newTransaction: Transaction = {
+                        ...transaction,
+                        id: res.data._id,
+                    };
+
+                    modifyCurrentUserData(data => ({
+                        ...data,
+                        transactions: [newTransaction, ...data.transactions]
+                    }));
+                    return;
+                } catch (err) {
+                    console.error('Failed to save expense on server, falling back to local', err);
+                }
+            }
+
+            // Fallback: local-only transaction id
+            const newTransaction = { ...transaction, id: `t-${Date.now()}` };
+            modifyCurrentUserData(data => ({
+                ...data,
+                transactions: [newTransaction, ...data.transactions]
+            }));
+        })();
     };
 
     const updateTransaction = (id: string, updatedTransaction: Omit<Transaction, 'id'>) => {
@@ -86,10 +154,22 @@ const App: React.FC = () => {
     };
 
     const deleteTransaction = (id: string) => {
-         modifyCurrentUserData(data => ({
-            ...data,
-            transactions: data.transactions.filter(t => t.id !== id)
-        }));
+         (async () => {
+            const headers = getAuthHeaders();
+            // If this is a server-created expense (id likely not starting with t-), try server delete
+            if (headers && !id.startsWith('t-')) {
+                try {
+                    await axios.delete(`/api/expenzo/expenses/${id}`, headers);
+                } catch (err) {
+                    console.error('Failed to delete expense on server, proceeding to remove locally', err);
+                }
+            }
+
+            modifyCurrentUserData(data => ({
+                ...data,
+                transactions: data.transactions.filter(t => t.id !== id)
+            }));
+         })();
     };
     
     const addBudget = (budget: Omit<Budget, 'id'>) => {
@@ -156,8 +236,17 @@ const App: React.FC = () => {
     };
     
     const handleLogin = (email: string) => {
+        // Ensure there's a frontend data entry for this user so the app can render user-specific pages
+        // If the backend authenticated the user but the frontend has no local data yet, initialize it
+        if (!allUsersData[email]) {
+            // addUser will create the entry in allUsersData and add to users list
+            addUser({ email, password: '' });
+        }
+
         setCurrentUser(email);
         setIsAuthenticated(true);
+        // Try to populate transactions from server for this user (expenses)
+        fetchExpensesFromServer(email);
     };
 
     const handleLogout = () => {
