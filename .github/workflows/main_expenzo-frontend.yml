@@ -57,4 +57,5 @@ jobs:
         with:
           app-name: 'expenzo-frontend'
           slot-name: 'Production'
-          package: dist  # deploy the extracted artifact
+          package: ./dist  # deploy the extracted artifact
+
