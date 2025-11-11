@@ -25,11 +25,11 @@ jobs:
           npm ci
           npm run build
 
-      - name: Upload build artifacts
+      - name: Upload build artifact
         uses: actions/upload-artifact@v4
         with:
           name: vite-build
-          path: dist  # built folder from Vite
+          path: dist
 
   deploy:
     runs-on: ubuntu-latest
@@ -43,7 +43,7 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: vite-build
-          path: dist  # extract the artifact into a 'dist' folder so Azure can find it
+          path: dist
 
       - name: Login to Azure
         uses: azure/login@v2
@@ -52,12 +52,9 @@ jobs:
           tenant-id: ${{ secrets.AZUREAPPSERVICE_TENANTID_2D9F3F8FF9FB4EDE9FDEDF168ABF6AC8 }}
           subscription-id: ${{ secrets.AZUREAPPSERVICE_SUBSCRIPTIONID_B60B342BB7E545DA9A83F8CABD41ABEA }}
 
-      - name: Deploy to Azure Web App
+      - name: Deploy to Azure Web App (copy dist contents)
         uses: azure/webapps-deploy@v3
         with:
           app-name: 'expenzo-frontend'
           slot-name: 'Production'
-          package: ./dist/**
-          app-artifact-location: ./dist
-
-
+          package: './dist'
