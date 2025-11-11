@@ -13,9 +13,8 @@ app.use(cors());
 app.use(express.json());
 
 // ✅ ROUTES
-app.use("/api/expenzo/users", userRoutes);
-app.use("/api/expenzo/expenses", expenseRoutes);
-
+app.use("/api/users", userRoutes);      // New path
+app.use("/api/expenses", expenseRoutes);  // New path
 // ✅ ROUTE DEBUG CHECK
 console.log("✅ Backend routes loading...");
 app._router?.stack?.forEach((r) => {

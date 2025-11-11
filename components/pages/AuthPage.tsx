@@ -11,7 +11,7 @@ interface AuthPageProps {
   addUser?: (user: UserCredentials) => void;
 }
 
-const API_URL = "https://expenzo-dpbvahcwdmeybeda.centralindia-01.azurewebsites.net";
+const API_URL = "/api";
 
 const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess }) => {
   const [step, setStep] = useState<AuthStep>("initial");
