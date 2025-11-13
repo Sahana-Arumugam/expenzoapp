@@ -11,7 +11,8 @@ interface AuthPageProps {
   addUser?: (user: UserCredentials) => void;
 }
 
-const API_URL = "/api";
+// Point to users route on backend
+const API_URL = "http://13.60.75.13:5000/api/expenzo/users";
 
 const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess }) => {
   const [step, setStep] = useState<AuthStep>("initial");
@@ -43,9 +44,12 @@ const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess }) => {
       if (rememberMe) localStorage.setItem("rememberedUser", email.toLowerCase());
       onLoginSuccess(res.data.email);
     } catch (err: any) {
-      const message = err.response?.data?.message || "Login failed. Please try again.";
+      console.error('Login error', err);
+      const serverMessage = err?.response?.data?.message;
+      const fallback = err?.message || "Login failed. Please try again.";
+      const message = serverMessage || fallback;
 
-      if (message.toLowerCase().includes("invalid email")) {
+      if (String(message).toLowerCase().includes("invalid email")) {
         // 👇 Take them to signup automatically if user not found
         setError("No account found. Let's create one!");
         setStep("signup");
@@ -87,7 +91,10 @@ const AuthPage: React.FC<AuthPageProps> = ({ onLoginSuccess }) => {
       if (rememberMe) localStorage.setItem("rememberedUser", email.toLowerCase());
       onLoginSuccess(res.data.email);
     } catch (err: any) {
-      setError(err.response?.data?.message || "Signup failed. Please try again.");
+      console.error('Signup error', err);
+      const serverMessage = err?.response?.data?.message;
+      const fallback = err?.message || "Signup failed. Please try again.";
+      setError(serverMessage || fallback);
     } finally {
       setIsLoading(false);
     }

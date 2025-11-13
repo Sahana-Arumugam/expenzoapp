@@ -6,34 +6,29 @@ import userRoutes from "./routes/userRoutes.js";
 import expenseRoutes from "./routes/expenseRoutes.js";
 
 dotenv.config();
+
+// ✅ Connect MongoDB
 connectDB();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
 
-// ✅ ROUTES
-app.use("/api/users", userRoutes);      // New path
-app.use("/api/expenses", expenseRoutes);  // New path
-// ✅ ROUTE DEBUG CHECK
-console.log("✅ Backend routes loading...");
-app._router?.stack?.forEach((r) => {
-  if (r.route && r.route.path) {
-    console.log(`➡️  Route loaded: ${r.route.path}`);
-  }
-});
+// ✅ ROUTES (must match frontend API_URL)
+app.use("/api/expenzo/users", userRoutes);
+app.use("/api/expenzo/expenses", expenseRoutes);
 
-// ✅ HEALTH CHECK
+// ✅ Health check endpoint
 app.get("/", (req, res) => {
   res.send("✅ Expenzo backend is running successfully");
 });
 
-// ✅ CATCH INVALID ROUTES (debugging)
+// ✅ Catch-all for undefined routes (debugging help)
 app.use((req, res) => {
   console.log("❌ Invalid route requested:", req.originalUrl);
   res.status(404).json({ message: "Route not found" });
 });
 
-// ✅ START SERVER
-const PORT = process.env.PORT || 5001; // 👈 ensure this matches your port
-app.listen(PORT, () => console.log(`🚀 Server running on port ${PORT}`));
+// ✅ Start server
+const PORT = process.env.PORT || 5000;
+app.listen(PORT, "0.0.0.0", () => console.log(`Server running on port ${PORT}`));

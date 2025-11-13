@@ -8,6 +8,17 @@ export default defineConfig(({ mode }) => {
       server: {
         port: 3000,
         host: '0.0.0.0',
+        // Proxy API requests to backend during development so
+        // requests like /api/expenzo/users/login are forwarded
+        // to http://localhost:5000 (where the backend runs).
+        proxy: {
+          '/api': {
+            target: 'http://localhost:5000',
+            changeOrigin: true,
+            secure: false,
+            // rewrite: (path) => path.replace(/^\/api/, '/api'),
+          },
+        },
       },
       plugins: [react()],
       define: {
