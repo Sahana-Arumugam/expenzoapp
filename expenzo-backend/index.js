@@ -7,28 +7,27 @@ import expenseRoutes from "./routes/expenseRoutes.js";
 
 dotenv.config();
 
-// ✅ Connect MongoDB
+// ✅ Connect MongoDB once during cold start
 connectDB();
 
 const app = express();
+
+// Middleware
 app.use(cors());
 app.use(express.json());
 
-// ✅ ROUTES (must match frontend API_URL)
+// ✅ API Routes
 app.use("/api/expenzo/users", userRoutes);
 app.use("/api/expenzo/expenses", expenseRoutes);
 
-// ✅ Health check endpoint
+// ✅ Root route for testing
 app.get("/", (req, res) => {
-  res.send("✅ Expenzo backend is running successfully");
+  res.send("✅ Expenzo backend is running successfully (Vercel)");
 });
 
-// ✅ Catch-all for undefined routes (debugging help)
-app.use((req, res) => {
-  console.log("❌ Invalid route requested:", req.originalUrl);
-  res.status(404).json({ message: "Route not found" });
-});
+// ❌ REMOVE THIS (NOT ALLOWED IN VERCEL):
+// const PORT = process.env.PORT || 5000;
+// app.listen(PORT, "0.0.0.0", () => console.log(`Server running on port ${PORT}`));
 
-// ✅ Start server
-const PORT = process.env.PORT || 5000;
-app.listen(PORT, "0.0.0.0", () => console.log(`Server running on port ${PORT}`));
+// ✅ EXPORT APP FOR VERCEL SERVERLESS FUNCTIONS
+export default app;
